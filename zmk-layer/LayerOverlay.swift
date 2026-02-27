@@ -147,8 +147,17 @@ struct OverlayContentWrapper: View {
             guard LayerSettings.shared.showOnlyWhenLocked else { return }
             if locked && hidManager.currentLayer != 0 {
                 withAnimation { isVisible = true }
-            } else if !locked {
+            } else if !locked && !(LayerSettings.shared.showMomentaryFromLocked && hidManager.isMomentaryFromLocked) {
                 withAnimation { isVisible = false }
+            }
+        }
+        .onChange(of: hidManager.isMomentaryFromLocked) { _, momentary in
+            guard LayerSettings.shared.showOnlyWhenLocked,
+                  LayerSettings.shared.showMomentaryFromLocked else { return }
+            // When momentary ends and we return to a locked layer, isLocked handles visibility.
+            // When momentary starts, ensure overlay stays visible.
+            if momentary {
+                withAnimation { isVisible = true }
             }
         }
         .onChange(of: hidManager.isConnected) { _, connected in
@@ -187,7 +196,8 @@ struct OverlayContentWrapper: View {
             }
         } else {
             hasReceivedNonZeroLayer = true
-            if lockedOnly && !hidManager.isLocked {
+            if lockedOnly && !hidManager.isLocked
+                && !(LayerSettings.shared.showMomentaryFromLocked && hidManager.isMomentaryFromLocked) {
                 withAnimation { isVisible = false }
             } else {
                 withAnimation { isVisible = true }

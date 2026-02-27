@@ -20,6 +20,7 @@ final class HIDManager {
     var isLocked: Bool = false
     var isConnected: Bool = false
     var deviceName: String = "No device"
+    var isMomentaryFromLocked: Bool = false
 
     // MARK: - Private
 
@@ -80,11 +81,21 @@ final class HIDManager {
         deviceName = "No device"
         currentLayer = 0
         isLocked = false
+        isMomentaryFromLocked = false
         print("[HIDManager] Device removed: \(name)")
     }
 
     fileprivate func handleReport(layer: UInt8, locked: Bool) {
         print("[HIDManager] Layer: \(layer), locked: \(locked)")
+
+        // Detect momentary layer activation from a locked layer:
+        // layer changed, was locked, now not locked → momentary from locked
+        if layer != currentLayer && isLocked && !locked {
+            isMomentaryFromLocked = true
+        } else if locked || layer == 0 {
+            isMomentaryFromLocked = false
+        }
+
         currentLayer = layer
         isLocked = locked
     }

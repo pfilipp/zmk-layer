@@ -38,11 +38,17 @@ final class LayerSettings {
         didSet { UserDefaults.standard.set(showOnlyWhenLocked, forKey: Self.lockedOnlyKey) }
     }
 
+    var showMomentaryFromLocked: Bool {
+        didSet { UserDefaults.standard.set(showMomentaryFromLocked, forKey: Self.momentaryFromLockedKey) }
+    }
+
     private static let storageKey = "layerConfigs"
     private static let lockedOnlyKey = "showOnlyWhenLocked"
+    private static let momentaryFromLockedKey = "showMomentaryFromLocked"
 
     private init() {
         self.showOnlyWhenLocked = UserDefaults.standard.bool(forKey: Self.lockedOnlyKey)
+        self.showMomentaryFromLocked = UserDefaults.standard.bool(forKey: Self.momentaryFromLockedKey)
         if let data = UserDefaults.standard.data(forKey: Self.storageKey),
            let decoded = try? JSONDecoder().decode([LayerConfig].self, from: data) {
             self.layers = decoded

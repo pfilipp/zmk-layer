@@ -6,11 +6,15 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Menu bar popover content showing device status, layer editor, and controls.
 struct ContentView: View {
 
     let hidManager: HIDManager
+
+    @State private var importedLayout: KeyboardLayoutData? = KeymapParser.load()
+    @State private var importError: String?
 
     private var layerDisplayName: String {
         LayerSettings.shared.displayName(for: hidManager.currentLayer)
@@ -108,6 +112,56 @@ struct ContentView: View {
             ))
             .font(.caption)
 
+            Toggle("Show momentary from locked", isOn: Binding(
+                get: { LayerSettings.shared.showMomentaryFromLocked },
+                set: { LayerSettings.shared.showMomentaryFromLocked = $0 }
+            ))
+            .font(.caption)
+            .disabled(!LayerSettings.shared.showOnlyWhenLocked)
+            .padding(.leading, 16)
+
+            Divider()
+
+            // Keyboard layout section
+            DisclosureGroup("Keyboard Layout") {
+                VStack(alignment: .leading, spacing: 8) {
+                    if let layout = importedLayout {
+                        Text("\(layout.physicalKeys.count) keys, \(layout.layers.count) layers")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if let error = importError {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+
+                    HStack(spacing: 8) {
+                        Button("Import Layout") {
+                            importKeymapFile()
+                        }
+                        .font(.caption)
+
+                        if importedLayout != nil {
+                            Button("Show Layout") {
+                                toggleKeyboardOverlay()
+                            }
+                            .font(.caption)
+                        }
+                    }
+
+                    LabeledContent("Toggle Layout") {
+                        ShortcutRecorderView(keyCombo: Binding(
+                            get: { SharedHotkeySettings.shared.overlayShortcut },
+                            set: { SharedHotkeySettings.shared.overlayShortcut = $0 }
+                        ))
+                    }
+                    .font(.caption)
+                }
+                .padding(.top, 4)
+            }
+
             Divider()
 
             Button("Quit") {
@@ -116,6 +170,39 @@ struct ContentView: View {
         }
         .padding(16)
         .frame(width: 260)
+    }
+
+    private func importKeymapFile() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.init(filenameExtension: "keymap")!]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.message = "Select a .keymap file"
+
+        guard panel.runModal() == .OK, let keymapURL = panel.url else { return }
+
+        // Look for matching .json in the same directory
+        let directory = keymapURL.deletingLastPathComponent()
+        let stem = keymapURL.deletingPathExtension().lastPathComponent
+        let jsonURL = directory.appendingPathComponent(stem + ".json")
+
+        guard FileManager.default.fileExists(atPath: jsonURL.path) else {
+            importError = "Could not find \(stem).json in the same directory."
+            return
+        }
+
+        do {
+            let layoutData = try KeymapParser.parse(keymapURL: keymapURL, jsonURL: jsonURL)
+            KeymapParser.save(layoutData)
+            importedLayout = layoutData
+            importError = nil
+        } catch {
+            importError = error.localizedDescription
+        }
+    }
+
+    private func toggleKeyboardOverlay() {
+        SharedKeyboardOverlay.shared.toggle()
     }
 
     private func binding(for index: Int, keyPath: WritableKeyPath<LayerConfig, String>) -> Binding<String> {
