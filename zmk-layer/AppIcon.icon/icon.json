@@ -1,0 +1,48 @@
+{
+  "fill" : {
+    "solid" : "display-p3:0.29233,0.64872,0.43950,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "glass" : false,
+          "image-name" : "keyboard.fill 3.svg",
+          "name" : "keyboard.fill 3",
+          "position" : {
+            "scale" : 1.7,
+            "translation-in-points" : [
+              0,
+              -239.8984375
+            ]
+          }
+        },
+        {
+          "image-name" : "square.3.layers.3d.top.filled 5.svg",
+          "name" : "square.3.layers.3d.top.filled 5",
+          "position" : {
+            "scale" : 4,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}
