@@ -65,6 +65,7 @@ jobs:
 
       - name: Create DMG
         run: |
+          ln -s /Applications "$RUNNER_TEMP/export/Applications"
           hdiutil create \
             -volname "ZMK Layer Monitor" \
             -srcfolder "$RUNNER_TEMP/export" \
@@ -77,7 +78,3 @@ jobs:
         with:
           files: ${{ runner.temp }}/ZMK-Layer-Monitor.dmg
           generate_release_notes: true
-
-      - name: Clean up keychain
-        if: always()
-        run: security delete-keychain signing_temp.keychain-db || true
