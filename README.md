@@ -10,7 +10,7 @@ A macOS menu bar app that displays your active ZMK keyboard layer in real time v
 - **Color-coded keys** — tap, hold, modifier-wrapped, and sticky keys are visually distinguished using a colorblind-safe palette
 - **Customizable layer names** — rename layers, add emoji, configure visibility (show only when locked, show momentary from locked)
 - **Configurable hotkey** — set any keyboard shortcut to toggle the overlay
-- **ZMK keymap parser** — import `.keymap` + `.json` file pairs from your ZMK config to display your actual keybindings
+- **ZMK keymap parser** — import your `.keymap` file to display your actual keybindings (physical layout is inferred automatically)
 
 ## Requirements
 
@@ -51,9 +51,18 @@ To display your actual keybindings in the keyboard overlay:
 1. Open ZMK Layer Monitor from the menu bar
 2. Click **Import Keyboard Layout**
 3. Select your `.keymap` file (e.g., `splitkb_aurora_sweep.keymap`)
-4. Select the matching `.json` physical layout file (e.g., `splitkb_aurora_sweep.json`)
 
-The `.keymap` file defines your keybindings, and the `.json` file defines the physical key positions. Both are typically found in your ZMK config repository.
+The physical key layout is inferred from the line structure of your `bindings` arrays — each line of bindings corresponds to one row of keys.
+
+## Supported Keymap Formats
+
+ZMK Layer Monitor supports the **standard (vanilla) ZMK devicetree format** — keymaps with an explicit `keymap {}` block containing layers with `bindings = < ... >` arrays.
+
+**Not supported:** macro-based keymap configs such as those using [urob's zmk-helpers](https://github.com/urob/zmk-helpers) (e.g., `ZMK_LAYER()` macros). These require C preprocessor expansion before the keymap can be parsed.
+
+If your config uses macros, you can:
+- Preprocess your keymap with `gcc -E` or `cpp` to expand macros, then import the result
+- Convert your keymap to the vanilla devicetree format manually
 
 ## Supported Behaviors
 
