@@ -80,4 +80,4 @@ jobs:
 
       - name: Clean up keychain
         if: always()
-        run: security delete-keychain signing_temp.keychain-db
+        run: security delete-keychain signing_temp.keychain-db || true
