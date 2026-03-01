@@ -136,20 +136,12 @@ struct SettingsView: View {
 
         guard panel.runModal() == .OK, let keymapURL = panel.url else { return }
 
-        let directory = keymapURL.deletingLastPathComponent()
-        let stem = keymapURL.deletingPathExtension().lastPathComponent
-        let jsonURL = directory.appendingPathComponent(stem + ".json")
-
-        guard FileManager.default.fileExists(atPath: jsonURL.path) else {
-            importError = "Could not find \(stem).json in the same directory."
-            return
-        }
-
         do {
-            let layoutData = try KeymapParser.parse(keymapURL: keymapURL, jsonURL: jsonURL)
+            let layoutData = try KeymapParser.parse(keymapURL: keymapURL)
             KeymapParser.save(layoutData)
             importedLayout = layoutData
             importError = nil
+            SharedKeyboardOverlay.shared.reloadLayout()
         } catch {
             importError = error.localizedDescription
         }

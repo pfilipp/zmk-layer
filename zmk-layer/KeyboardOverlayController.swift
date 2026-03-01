@@ -44,6 +44,14 @@ final class KeyboardOverlayController {
         isShown = false
     }
 
+    func reloadLayout() {
+        panel?.orderOut(nil)
+        panel = nil
+        if isShown {
+            show()
+        }
+    }
+
     // MARK: - Panel Creation
 
     private func createPanel() {

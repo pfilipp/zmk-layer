@@ -32,8 +32,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var overlayController: OverlayWindowController?
     private let hotkeyService = HotkeyService()
+    private var onboardingWindow: OnboardingWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if OnboardingState.hasCompletedOnboarding {
+            startNormalFlow()
+        } else {
+            showOnboarding()
+        }
+    }
+
+    private func showOnboarding() {
+        let window = OnboardingWindow()
+        window.onComplete = { [weak self] in
+            self?.onboardingWindow = nil
+            self?.startNormalFlow()
+        }
+        onboardingWindow = window
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func startNormalFlow() {
         let controller = OverlayWindowController(hidManager: SharedHIDManager.shared)
         self.overlayController = controller
         controller.showOverlay()

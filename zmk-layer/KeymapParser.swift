@@ -63,20 +63,6 @@ struct KeyboardLayoutData: Codable {
     let layers: [ParsedLayer]
 }
 
-// MARK: - JSON Layout Parsing
-
-private struct PhysicalLayoutJSON: Codable {
-    let layouts: LayoutsContainer
-
-    struct LayoutsContainer: Codable {
-        let default_transform: TransformContainer
-    }
-
-    struct TransformContainer: Codable {
-        let layout: [PhysicalKey]
-    }
-}
-
 // MARK: - Keycode Display Map
 
 let keycodeMap: [String: String] = [
@@ -156,37 +142,103 @@ enum KeymapParser {
 
     // MARK: - Public API
 
-    static func parse(keymapURL: URL, jsonURL: URL) throws -> KeyboardLayoutData {
-        let physicalKeys = try parsePhysicalLayout(from: jsonURL)
-        let layers = try parseKeymap(from: keymapURL, keyCount: physicalKeys.count)
-        return KeyboardLayoutData(physicalKeys: physicalKeys, layers: layers)
-    }
+    static func parse(keymapURL: URL) throws -> KeyboardLayoutData {
+        let content = try String(contentsOf: keymapURL, encoding: .utf8)
 
-    // MARK: - Physical Layout
-
-    static func parsePhysicalLayout(from url: URL) throws -> [PositionedKey] {
-        let data = try Data(contentsOf: url)
-        let layoutJSON = try JSONDecoder().decode(PhysicalLayoutJSON.self, from: data)
-        let keys = layoutJSON.layouts.default_transform.layout
-
-        return keys.map { key in
-            PositionedKey(physical: key)
-        }
-    }
-
-    // MARK: - Keymap Parsing
-
-    static func parseKeymap(from url: URL, keyCount: Int) throws -> [ParsedLayer] {
-        let content = try String(contentsOf: url, encoding: .utf8)
-
-        // Find the keymap { ... } block
         guard let keymapRange = findKeymapBlock(in: content) else {
             throw ParseError.keymapBlockNotFound
         }
         let keymapContent = String(content[keymapRange])
 
-        // Find each layer block within the keymap
-        return parseLayerBlocks(from: keymapContent, keyCount: keyCount)
+        // Find the first layer's raw bindings (with newlines preserved) to infer layout
+        guard let firstRawBindings = findFirstRawBindings(in: keymapContent) else {
+            throw ParseError.keymapBlockNotFound
+        }
+        let physicalKeys = inferPhysicalLayout(from: firstRawBindings)
+
+        let layers = parseLayerBlocks(from: keymapContent, keyCount: physicalKeys.count)
+        return KeyboardLayoutData(physicalKeys: physicalKeys, layers: layers)
+    }
+
+    // MARK: - Layout Inference
+
+    /// Infers physical key positions from the line structure of a bindings block.
+    /// Each non-empty line becomes a row; keys are split into left/right halves with a gap.
+    static func inferPhysicalLayout(from rawBindings: String) -> [PositionedKey] {
+        let rows = rawBindings.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+
+        let keysPerRow = rows.map { row in
+            row.components(separatedBy: "&")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+                .count
+        }
+
+        let maxKeysPerRow = keysPerRow.max() ?? 0
+        let halfCols = maxKeysPerRow / 2
+
+        var keys: [PositionedKey] = []
+        var globalCol = 0
+
+        for (rowIndex, count) in keysPerRow.enumerated() {
+            let keysPerHalf = count / 2
+            let leftExtra = count % 2  // odd key goes to left half
+
+            // Left half: starts at (halfCols - keysPerHalf - leftExtra)
+            let leftStart = halfCols - keysPerHalf - leftExtra
+            for i in 0..<(keysPerHalf + leftExtra) {
+                let x = Double(leftStart + i)
+                let physical = PhysicalKey(x: x, y: Double(rowIndex), row: rowIndex, col: globalCol)
+                keys.append(PositionedKey(physical: physical))
+                globalCol += 1
+            }
+
+            // Right half: starts at (halfCols + 1)
+            let rightStart = halfCols + 1
+            for i in 0..<keysPerHalf {
+                let x = Double(rightStart + i)
+                let physical = PhysicalKey(x: x, y: Double(rowIndex), row: rowIndex, col: globalCol)
+                keys.append(PositionedKey(physical: physical))
+                globalCol += 1
+            }
+        }
+
+        return keys
+    }
+
+    /// Finds the raw bindings string (preserving newlines) from the first layer in the keymap.
+    private static func findFirstRawBindings(in keymapContent: String) -> String? {
+        let lines = keymapContent.components(separatedBy: "\n")
+        var i = 0
+        while i < lines.count {
+            let trimmed = lines[i].trimmingCharacters(in: .whitespaces)
+            if trimmed.hasSuffix("{"),
+               !trimmed.contains("keymap"),
+               !trimmed.contains("compatible") {
+                // Collect block content
+                var depth = 1
+                var blockContent = ""
+                i += 1
+                while i < lines.count && depth > 0 {
+                    for ch in lines[i] {
+                        if ch == "{" { depth += 1 }
+                        if ch == "}" { depth -= 1 }
+                    }
+                    if depth > 0 {
+                        blockContent += lines[i] + "\n"
+                    }
+                    i += 1
+                }
+                if let raw = extractBindings(from: blockContent) {
+                    return raw
+                }
+                continue
+            }
+            i += 1
+        }
+        return nil
     }
 
     // MARK: - Private Helpers
@@ -416,46 +468,18 @@ enum KeymapParser {
     }
 
     static func load() -> KeyboardLayoutData? {
-        // Try UserDefaults first (user-imported layout)
-        if let data = UserDefaults.standard.data(forKey: storageKey),
-           let layout = try? JSONDecoder().decode(KeyboardLayoutData.self, from: data) {
-            return layout
-        }
-        // Fall back to bundled default layout
-        return loadBundledDefault()
-    }
-
-    static func loadBundledDefault() -> KeyboardLayoutData? {
-        guard let keymapURL = Bundle.main.url(forResource: "splitkb_aurora_sweep", withExtension: "keymap") else {
-            print("[KeymapParser] Bundled .keymap not found in bundle")
-            print("[KeymapParser] Bundle path: \(Bundle.main.bundlePath)")
-            return nil
-        }
-        guard let jsonURL = Bundle.main.url(forResource: "splitkb_aurora_sweep", withExtension: "json") else {
-            print("[KeymapParser] Bundled .json not found in bundle")
-            return nil
-        }
-        print("[KeymapParser] Loading from bundle: \(keymapURL.path)")
-        do {
-            let result = try parse(keymapURL: keymapURL, jsonURL: jsonURL)
-            print("[KeymapParser] Parsed \(result.physicalKeys.count) keys, \(result.layers.count) layers")
-            return result
-        } catch {
-            print("[KeymapParser] Parse error: \(error)")
-            return nil
-        }
+        guard let data = UserDefaults.standard.data(forKey: storageKey) else { return nil }
+        return try? JSONDecoder().decode(KeyboardLayoutData.self, from: data)
     }
 
     // MARK: - Errors
 
     enum ParseError: LocalizedError {
         case keymapBlockNotFound
-        case jsonDecodingFailed
 
         var errorDescription: String? {
             switch self {
             case .keymapBlockNotFound: return "Could not find 'keymap { }' block in the .keymap file."
-            case .jsonDecodingFailed: return "Failed to decode physical layout from JSON file."
             }
         }
     }
