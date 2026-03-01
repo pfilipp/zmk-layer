@@ -14,7 +14,7 @@ final class KeyboardOverlayController {
 
     private var panel: OverlayPanel?
     private let hidManager: HIDManager
-    private var isShown = false
+    private(set) var isShown = false
 
     init(hidManager: HIDManager) {
         self.hidManager = hidManager

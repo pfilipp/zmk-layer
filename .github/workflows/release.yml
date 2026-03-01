@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+
+      - name: Build archive
+        run: |
+          xcodebuild archive \
+            -project zmk-layer.xcodeproj \
+            -scheme zmk-layer \
+            -configuration Release \
+            -archivePath $RUNNER_TEMP/zmk-layer.xcarchive \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Export app
+        run: |
+          mkdir -p $RUNNER_TEMP/export
+          cp -R $RUNNER_TEMP/zmk-layer.xcarchive/Products/Applications/zmk-layer.app \
+            $RUNNER_TEMP/export/
+
+      - name: Create DMG
+        run: |
+          hdiutil create \
+            -volname "ZMK Layer Monitor" \
+            -srcfolder $RUNNER_TEMP/export \
+            -ov \
+            -format UDZO \
+            $RUNNER_TEMP/ZMK-Layer-Monitor.dmg
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ runner.temp }}/ZMK-Layer-Monitor.dmg
+          generate_release_notes: true

@@ -18,7 +18,11 @@ struct zmk_layerApp: App {
         } label: {
             Image(systemName: "keyboard")
         }
-        .menuBarExtraStyle(.window)
+        .menuBarExtraStyle(.menu)
+
+        Settings {
+            SettingsView()
+        }
     }
 }
 
