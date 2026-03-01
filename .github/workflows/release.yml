@@ -13,35 +13,71 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+        run: sudo xcode-select -s /Applications/Xcode_26.3.0.app/Contents/Developer
+
+      - name: Import code-signing certificate
+        uses: Apple-Actions/import-codesign-certs@v6
+        with:
+          p12-file-base64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          p12-password: ${{ secrets.P12_PASSWORD }}
+          keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
 
       - name: Build archive
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           xcodebuild archive \
             -project zmk-layer.xcodeproj \
             -scheme zmk-layer \
             -configuration Release \
-            -archivePath $RUNNER_TEMP/zmk-layer.xcarchive \
-            CODE_SIGN_IDENTITY="-" \
-            CODE_SIGNING_ALLOWED=NO
+            -archivePath "$RUNNER_TEMP/zmk-layer.xcarchive" \
+            CODE_SIGN_IDENTITY="Developer ID Application" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            OTHER_CODE_SIGN_FLAGS="--timestamp" \
+            CODE_SIGN_STYLE=Manual
 
       - name: Export app
         run: |
-          mkdir -p $RUNNER_TEMP/export
-          cp -R $RUNNER_TEMP/zmk-layer.xcarchive/Products/Applications/zmk-layer.app \
-            $RUNNER_TEMP/export/
+          mkdir -p "$RUNNER_TEMP/export"
+          cp -R "$RUNNER_TEMP/zmk-layer.xcarchive/Products/Applications/zmk-layer.app" \
+            "$RUNNER_TEMP/export/"
+
+      - name: Notarize app
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          xcrun notarytool store-credentials "notary-profile" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_ID_PASSWORD" \
+            --team-id "$TEAM_ID"
+
+          ditto -c -k --keepParent \
+            "$RUNNER_TEMP/export/zmk-layer.app" \
+            "$RUNNER_TEMP/zmk-layer.zip"
+
+          xcrun notarytool submit "$RUNNER_TEMP/zmk-layer.zip" \
+            --keychain-profile "notary-profile" \
+            --wait
+
+          xcrun stapler staple "$RUNNER_TEMP/export/zmk-layer.app"
 
       - name: Create DMG
         run: |
           hdiutil create \
             -volname "ZMK Layer Monitor" \
-            -srcfolder $RUNNER_TEMP/export \
+            -srcfolder "$RUNNER_TEMP/export" \
             -ov \
             -format UDZO \
-            $RUNNER_TEMP/ZMK-Layer-Monitor.dmg
+            "$RUNNER_TEMP/ZMK-Layer-Monitor.dmg"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ runner.temp }}/ZMK-Layer-Monitor.dmg
           generate_release_notes: true
+
+      - name: Clean up keychain
+        if: always()
+        run: security delete-keychain signing_temp.keychain-db
