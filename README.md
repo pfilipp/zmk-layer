@@ -4,12 +4,6 @@
 
 A macOS menu bar app that displays your active ZMK keyboard layer in real time via HID, with a full keyboard overlay showing keybindings for the current layer.
 
-## Screenshots
-
-<!-- Add screenshots here -->
-<!-- ![Keyboard Overlay](screenshots/overlay.png) -->
-<!-- ![Menu Bar](screenshots/menubar.png) -->
-
 ## Features
 
 - **Real-time HID layer tracking** — monitors your ZMK keyboard's active layer via a custom HID report
