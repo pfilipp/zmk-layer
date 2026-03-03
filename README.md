@@ -1,6 +1,14 @@
 # ZMK Layer Monitor
 
+**[Website](https://apps.filipp.tech/zmk-layer-monitor)** | **[Download](https://github.com/pfilipp/zmk-layer/releases/latest)**
+
 A macOS menu bar app that displays your active ZMK keyboard layer in real time via HID, with a full keyboard overlay showing keybindings for the current layer.
+
+## Screenshots
+
+<!-- Add screenshots here -->
+<!-- ![Keyboard Overlay](screenshots/overlay.png) -->
+<!-- ![Menu Bar](screenshots/menubar.png) -->
 
 ## Features
 
